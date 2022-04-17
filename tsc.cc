@@ -215,9 +215,11 @@ IReply Client::processCommand(std::string& input)
 
         if (cmd == "FOLLOW") {
             return Follow(argument);
-        } else if(cmd == "UNFOLLOW") {
-            return UnFollow(argument);
         }
+        //no use in the unfollow command 
+        /*else if(cmd == "UNFOLLOW") {
+            return UnFollow(argument);
+        }*/
     } else {
         if (input == "LIST") {
             return List();
@@ -306,7 +308,8 @@ IReply Client::Follow(const std::string& username2) {
     return ire;
 }
 
-IReply Client::UnFollow(const std::string& username2) {
+//Function not needed in MP3
+/*IReply Client::UnFollow(const std::string& username2) {
     Request request;
 
     request.set_username(username);
@@ -330,7 +333,7 @@ IReply Client::UnFollow(const std::string& username2) {
     }
 
     return ire;
-}
+}*/
 
 IReply Client::Login() {
     Request request;
