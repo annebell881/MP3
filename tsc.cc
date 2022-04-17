@@ -7,6 +7,7 @@
 #include <grpc++/grpc++.h>
 #include "client.h"
 
+//NOTE THAT THE MP2 SOULTION IS USED IN THE SOULTION
 #include "sns.grpc.pb.h"
 using grpc::Channel;
 using grpc::ClientContext;
@@ -19,6 +20,16 @@ using csce438::ListReply;
 using csce438::Request;
 using csce438::Reply;
 using csce438::SNSService;
+
+//Client needs to retrieve the Coordinator Infomation
+std::string coord_host;
+std::string coord_port;
+
+//Client is also going to need the following data
+int client_ID;
+//client ID is also frequently used throughout the code
+std::unique_ptr<csce438::SNSCoord::Stub> client_stub;
+
 
 Message MakeMessage(const std::string& username, const std::string& msg) {
     Message m;
@@ -61,21 +72,52 @@ class Client : public IClient
 };
 
 int main(int argc, char** argv) {
+    //main needs to be updated to match the call
+    if(argv != 5){
+        std::cerr << "Invalid number of arguments " <<  std::endl;
+        exit(1);
+    }
 
     std::string hostname = "localhost";
-    std::string username = "default";
+    //std::string username = "default";
+    //this MP uses client ID in place of username
+    int client_ID = -1; //by default this is a -1 since we dont have any clients
     std::string port = "3010";
-    int opt = 0;
-    while ((opt = getopt(argc, argv, "h:u:p:")) != -1){
-        switch(opt) {
-            case 'h':
-                hostname = optarg;break;
-            case 'u':
-                username = optarg;break;
-            case 'p':
-                port = optarg;break;
-            default:
-                std::cerr << "Invalid Command Line Argument\n";
+
+    //loop through and find the correct arguments
+    for (int i = 1; i < argc; i++)
+    {
+        std::string arg(argv[i]);
+
+        if (argc == i + 1)
+        {
+            std::cerr << "Invalid arguments " <<  std::endl;
+            exit(1);
+        }
+
+        if (arg == "-cip")
+        {
+            hostname = argv[i + 1];
+            i++;
+        }
+        else if (arg == "-cp")
+        {
+            port = argv[i + 1];
+            if (port.size() > 6){
+                std::cerr << "Invalid number of arguments " <<  std::endl;
+                exit(1);
+            }
+            i++;
+        }
+        else if (arg == "-id")
+        {
+            client_ID = atoi(argv[i + 1]);
+            if (client_ID < 0)
+            {
+                std::cerr << "Invalid number of arguments " <<  std::endl;
+                exit(1);
+            }
+            i++;
         }
     }
 
