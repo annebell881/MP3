@@ -20,6 +20,15 @@ using csce438::ListReply;
 using csce438::Request;
 using csce438::Reply;
 using csce438::SNSService;
+//add the cordinator into the  info
+using csce438::SNSCoordinator;
+using csce438::Req;
+using csce438::Rep;
+using csce438::ClusterInfo;
+using csce438::ServerInfo;
+using csce438::JoinReq;
+using csce438::FollowerInfo;
+using csce438::HeartBeat;
 
 //Client needs to retrieve the Coordinator Infomation
 std::string coord_host;
@@ -54,6 +63,8 @@ class Client : public IClient
         virtual int connectTo();
         virtual IReply processCommand(std::string& input);
         virtual void processTimeline();
+        //a big point is that the master might disconnect; this func is to check
+        void renew_conn();
     private:
         std::string hostname;
         std::string username;
@@ -139,10 +150,26 @@ int Client::connectTo()
     // a member variable in your own Client class.
     // Please refer to gRpc tutorial how to create a stub.
 	// ------------------------------------------------------------
-    std::string login_info = hostname + ":" + port;
+    //need to add functions to connect to the cordinator
+    std::string cord_login_info = coord_host + ":" + coord_port;
+    client_stub = std::<SNSCoord::Stub>(SNSCoord::NewStub(grpc::CreateChannel(cord_login_info, grpc::InsecureChannelCredentials())));
+    //grab the context to create the log in info below in MP2
+    ClientContext contex;
+    JoinReq join_rq;
+    join_rq.set_id(client_ID);
+    ClusterInfo clusI;
+    client_stub->GetConnection(&contex, join_rq,clusI);
+    //MP2 soultion
+    //update it to match the cluster
+    std::string login_info = clusI.addres() + ":" + clusI.port();
     stub_ = std::unique_ptr<SNSService::Stub>(SNSService::NewStub(
                grpc::CreateChannel(
                     login_info, grpc::InsecureChannelCredentials())));
+    hostname = clusI.addres();
+    port = clusI.port();
+    //thread the cluster into the coordinator
+    std::thread clust_thread(&Client::renew_conn,this);
+    t.detach();
 
     IReply ire = Login();
     if(!ire.grpc_status.ok()) {
@@ -387,3 +414,26 @@ void Client::Timeline(const std::string& username) {
     reader.join();
 }
 
+void Client::renew_conn(){
+    //check if the master died every 15 seconds maybe?
+    for(;;){
+        sleep(15);
+        //try to reconnect to the client
+        ClientContext cont;
+        JoinReq join_req;
+        join_req.set_id(client_ID);
+        ClusterInfo clusI;
+        client_stub->GetConnection(&cont, join_req, &clusI);
+        //now we need to fix the ports and clients
+        if (port != clusI.port() || hostname != clusI.addr()){
+            std::string login_info = clusI.addr() + ":" + clusI.port();
+            stub_ = std::unique_ptr<SNSService::Stub>(SNSService::NewStub(
+                grpc::CreateChannel(
+                    login_info, grpc::InsecureChannelCredentials())));
+
+            hostname = clusI.addr();
+            port = clusI.port();
+        }
+    }
+    
+}

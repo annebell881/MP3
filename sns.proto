@@ -39,9 +39,31 @@ service SNSService{
   rpc Login (Request) returns (Reply) {}
   rpc List (Request) returns (ListReply) {}
   rpc Follow (Request) returns (Reply) {}
-  rpc UnFollow (Request) returns (Reply) {}
+  //rpc UnFollow (Request) returns (Reply) {}
   // Bidirectional streaming RPC
   rpc Timeline (stream Message) returns (stream Message) {} 
+	
+  //Need to connect the slave and master along with the streaming
+  //slave needs master to know they exist
+  rpc SlaveToMaster(ServerInfo)returns(ServerInfo){}
+  //Slave needs to updated in Followers, login and the timeline from master
+  rpc FollowUpdate(Request) returns (Reply){}
+  rpc LoginUpdate(Request) returns (Reply){}
+  rpc TimelineUpdate (stream Message) returns (stream Message){}
+  
+}
+
+service SNSCoordinator{
+    //used in MP2 sns more
+    //rpc Login (Req) returns (Rep) {}
+    //Server sends the cluster to the coordinator 
+    rpc ClusterSpace (ClusterInfo) returns (ServerInfo){}
+    //Client sends the connection to the coordinator
+    rpc GetConn(JoinReq) returns (ClusterInfo){}
+    //need the cluster to have the follower information
+    rpc GetFollowing(JoinReq) returns (FollowerInfo)
+    // Bidirectional Communication to check on server interaction
+    rpc ServerCommunicate (stream HeartBeat) returns (stream HeartBeat) {}
 }
 
 message ListReply {
@@ -65,4 +87,67 @@ message Message {
   string msg = 2;
   //Time the message was sent
   google.protobuf.Timestamp timestamp = 3;
+}
+
+enum ServerType{
+    MASTER = 0;
+    SLAVE = 1;
+    SYNCHRONIZER = 3;
+    COORDINATOR = 4;
+}
+
+enum RequesterType{
+    CLIENT = 0;
+    SERVER = 1;
+}
+
+message Req{
+    // type of requester
+    RequesterType requester = 1;
+    // message with their port number
+    string port_number = 2;
+    // the id of the request
+    int32 id = 3;
+    // the type of server
+    ServerType server_type = 4;
+}
+
+message Rep{
+    string msg = 1;
+}
+
+//Information surrounding the cluster AKA machine add, port, follower id and server id
+message ClusterInfo{
+  string machineAdd = 1;
+  string port =2;
+  int32 followId = 3;
+  int32 sid = 4;
+}
+
+//server Information; master, port num, address
+message ServerInfo{
+  bool master = 1; //make the master the machine running? I think this is how it works for the kill
+  string port = 2;
+  string addre = 3;
+}
+
+//Join request (we just want the id of the user to join the cluster)
+message JoinReq{
+  int32 id = 1;
+}
+
+//follower information; id, following and followers
+message FollowerInfo{
+  int32 id = 1;
+  repeated int32 following = 2;
+  repeated int32 followers = 3;
+}
+
+message HeartBeat{
+    // id of the server
+    int32 sid = 1;
+    // type of the server
+    ServerType s_type = 2;
+    //Time the message was sent
+    google.protobuf.Timestamp timestamp = 3;
 }
