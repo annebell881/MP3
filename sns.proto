@@ -63,7 +63,8 @@ service SNSCoordinator{
     //need the cluster to have the follower information
     rpc GetFollowing(JoinReq) returns (FollowerInfo)
     // Bidirectional Communication to check on server interaction
-    rpc ServerCommunicate (stream HeartBeat) returns (stream HeartBeat) {}
+    rpc ServerCommunicate (HrtBeat) returns (HrtBeat) {}
+    rpc GetAllUsers (Request) returns (AllUsers) {}
 }
 
 message ListReply {
@@ -143,11 +144,15 @@ message FollowerInfo{
   repeated int32 followers = 3;
 }
 
-message HeartBeat{
+message HrtBeat{
     // id of the server
     int32 sid = 1;
     // type of the server
     ServerType s_type = 2;
     //Time the message was sent
     google.protobuf.Timestamp timestamp = 3;
+}
+
+message AllUsers {
+    repeated int32 users = 1;
 }

@@ -44,6 +44,15 @@
 #include <unistd.h>
 #include <google/protobuf/util/time_util.h>
 #include <grpc++/grpc++.h>
+#include <thread>
+#include <sstream>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <memory>
 
 #include "sns.grpc.pb.h"
 
@@ -61,18 +70,47 @@ using csce438::ListReply;
 using csce438::Request;
 using csce438::Reply;
 using csce438::SNSService;
+//add the cordinator into the  info
+using csce438::SNSCoordinatorinator;
+using csce438::Req;
+using csce438::Rep;
+using csce438::ClusterInfo;
+using csce438::ServerInfo;
+using csce438::JoinReq;
+using csce438::FollowerInfo;
+using csce438::HeartBeat;
 
 struct Client {
   std::string username;
   bool connected = true;
   int following_file_size = 0;
-  std::vector<Client*> client_followers;
-  std::vector<Client*> client_following;
+  //change the Client to id's since they dont have a username
+  std::vector<int> client_followers;
+  std::vector<int> client_following;
   ServerReaderWriter<Message, Message>* stream = 0;
   bool operator==(const Client& c1) const{
     return (username == c1.username);
   }
 };
+
+//info for the coordinator
+std::string c_hostname;
+std::string c_port;
+
+//create stubs
+std::unique_ptr<csce438::SNSCoordinator::Stub> c_stub; //Coordinator
+//the stub needs to be completed for slave/master proccess to connect them
+std::unique_ptr<csce438::SNSService::Stub> s_stub = nullptr;
+
+//server data
+int s_id;
+bool master; //is it the master server?
+std::string s_port;
+std::string s_hostname;
+
+//Slave info
+std::string slave_port;
+std::string slave_addr;
 
 //Vector that stores every client that has been created
 std::vector<Client> client_db;
@@ -88,10 +126,31 @@ int find_user(std::string username){
   return -1;
 }
 
+//Need a heartbeat function to test if the master is alive
+void heartBeatFunc(){
+  Status stat;
+  for(;;){
+    HrtBeat hb;
+    HrtBeat hb2;
+    hb.set_id(s_id);
+    hb.set_master(master);
+    ClientContext cont;
+    //set the heartbeat to the stub
+    stat = c_stub->ServerCommunicate(&cont,hb, &hb2);
+    //check if their is a heartbeat
+    if(!stat.ok()){
+      cout << "Failed to detect Heartbeat" << endl;
+      return;
+    } 
+    //else check every 10 seconds for heartbeats
+    sleep(10);
+  }
+}
+
 class SNSServiceImpl final : public SNSService::Service {
   
   Status List(ServerContext* context, const Request* request, ListReply* list_reply) override {
-    Client user = client_db[find_user(request->username())];
+    /*Client user = client_db[find_user(request->username())];
     int index = 0;
     for(Client c : client_db){
       list_reply->add_all_users(c.username);
@@ -99,6 +158,24 @@ class SNSServiceImpl final : public SNSService::Service {
     std::vector<Client*>::const_iterator it;
     for(it = user.client_followers.begin(); it!=user.client_followers.end(); it++){
       list_reply->add_followers((*it)->username);
+    }*/
+    //fix so that it works for the clusters
+    int id = request->username();
+    ClientContext cont;
+    AllUsers user_base;
+    c_stub->GetAllUsers(&cont, &user_base);
+    for (auto u : user_base.users())
+    {
+      list_reply->add_all_users(u);
+    }
+    std::ifstream ifs(std::to_string(id)+"followedBy.txt");
+    std::string u = "";
+    while (ifs.good()){
+      std::getline(ifs, u, ',');
+      if (u == "" || u == " "){
+          continue;
+      }
+      list_reply->add_followers(atoi(u.c_str()));
     }
     return Status::OK;
   }
@@ -120,10 +197,20 @@ class SNSServiceImpl final : public SNSService::Service {
       user2->client_followers.push_back(user1);
       reply->set_msg("Follow Successful");
     }
+
+    //update the slave once our status is okay
+    if (s_stub != nullptr){
+      FollowData follow;
+      follow.set_id(username1);
+      follow.mutable_following()->Add(user1->client_following.begin(), user1->client_following.end());
+      follow.mutable_followers()->Add(user1->client_followers.begin(), user1->client_followers.end());
+      ClientContext context;
+      s_stub->FollowUpdate(&context, follow);
+    }
     return Status::OK; 
   }
 
-  Status UnFollow(ServerContext* context, const Request* request, Reply* reply) override {
+  /*Status UnFollow(ServerContext* context, const Request* request, Reply* reply) override {
     std::string username1 = request->username();
     std::string username2 = request->arguments(0);
     int leave_index = find_user(username2);
@@ -141,7 +228,7 @@ class SNSServiceImpl final : public SNSService::Service {
       reply->set_msg("UnFollow Successful");
     }
     return Status::OK;
-  }
+  }*/
   
   Status Login(ServerContext* context, const Request* request, Reply* reply) override {
     Client c;
@@ -246,17 +333,80 @@ void RunServer(std::string port_no) {
 }
 
 int main(int argc, char** argv) {
-  
-  std::string port = "3010";
-  int opt = 0;
-  while ((opt = getopt(argc, argv, "p:")) != -1){
-    switch(opt) {
-      case 'p':
-          port = optarg;break;
-      default:
-	  std::cerr << "Invalid Command Line Argument\n";
-    }
+  //check if proper amount of aurguments
+  if (argc < 9)
+  {
+    std::cerr << "Invalid number of arguments " <<  std::endl;
+    exit(1);
   }
+  //est the coordinator and the server information
+  s_port = "3010"
+  c_hostname = "127.0.0.1";
+  c_port = "";
+  s_id = -1;
+  isMaster = false;
+
+    for (int i = 1; i < argc; i++)
+    {
+        std::string arg(argv[i]);
+
+        if (argc == i + 1)
+        {
+            std::cerr << "Invalid arguments " <<  std::endl;
+            exit(1);
+        }
+
+        if (arg == "-cip")
+        {
+            c_hostname = argv[i + 1];
+            i++;
+        }
+        else if (arg == "-cp")
+        {
+            c_port = argv[i + 1];
+            if (c_port.size() > 6)
+            {
+              std::cerr << "Invalid arguments " <<  std::endl;
+              exit(1);
+            }
+            i++;
+        }
+        else if (arg == "-p")
+        {
+            my_port = argv[i + 1];
+            if (my_port.size() > 6)
+            {
+              std::cerr << "Invalid arguments " <<  std::endl;
+              exit(1);
+            }
+            i++;
+        }
+        else if (arg == "-id")
+        {
+            s_id = atoi(argv[i + 1]);
+            if (s_id < 0)
+            {
+              std::cerr << "Invalid arguments " <<  std::endl;
+              exit(1);
+            }
+            i++;
+        }
+        else if (arg == "-t")
+        {
+            std::string op(argv[i + 1]);
+            if (op == "master")
+                isMaster = true;
+            else if (op == "slave")
+                isMaster = false;
+            else
+            {
+              std::cerr << "Invalid arguments " <<  std::endl;
+              exit(1);
+            }  
+            i++;
+        }
+    }
+    
   RunServer(port);
 
   return 0;
