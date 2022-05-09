@@ -154,9 +154,7 @@ message HrtBeat{
     // id of the server
     int32 sid = 1;
     // type of the server
-    ServerType s_type = 2;
-    //Time the message was sent
-    google.protobuf.Timestamp timestamp = 3;
+    bool stype = 2;
 }
 
 message AllUsers {
@@ -177,4 +175,9 @@ message FollowData {
   repeated int32 following = 2;
   //Whose following them
   repeated int32 followers = 3;
+}
+
+//issue with make had a problem with the get all users 
+message Filler {
+  bool filled = 1;
 }

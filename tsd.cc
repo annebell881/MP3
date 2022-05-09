@@ -137,7 +137,7 @@ void heartBeatFunc(){
     HrtBeat hb;
     HrtBeat hb2;
     hb.set_sid(s_id);
-    hb.set_s_type(master);
+    hb.set_stype(master);
     ClientContext cont;
     //set the heartbeat to the stub
     stat = c_stub->getServerCon(&cont,hb, &hb2);
@@ -149,6 +149,16 @@ void heartBeatFunc(){
     //else check every 10 seconds for heartbeats
     sleep(10);
   }
+}
+
+//getting a time stamp; https://stackoverflow.com/questions/6012663/get-unix-timestamp-with-c
+std::string getTimeStamp(time_t t){
+    char buf[32];
+    struct tm* tm = localtime(&t);
+    strftime (buf, 32, "%Y-%m-%d %H:%M:%S", tm);
+    std::string outt = buf;
+
+    return outt;
 }
 
 class SNSServiceImpl final : public SNSService::Service {
@@ -168,7 +178,7 @@ class SNSServiceImpl final : public SNSService::Service {
     ClientContext cont;
     AllUsers user_base;
     Filler fill;
-    c_stub->GetAllUsers(&cont, filler, &user_base);
+    c_stub->GetAllUsers(&cont, fill, &user_base);
     for (auto u : user_base.users())
     {
       list_reply->add_all_users(u);
@@ -190,7 +200,7 @@ class SNSServiceImpl final : public SNSService::Service {
     int username2 = request->arguments(0);
     int join_index = find_user(username2);
     if(join_index < 0 || username1 == username2)
-      reply->set_msg("unkown user name");
+      reply->set_msg("unknown user name");
     else{
       Client *user1 = &client_db[find_user(username1)];
       Client *user2 = &client_db[join_index];
@@ -198,10 +208,10 @@ class SNSServiceImpl final : public SNSService::Service {
 	      reply->set_msg("you have already joined");
         return Status::OK;
       }
-      user1->client_following.push_back(user2);
-      user2->client_followers.push_back(user1);
+      user1->client_following.push_back(usernamr2);
+      user2->client_followers.push_back(username1);
       reply->set_msg("Follow Successful");
-    }
+    
 
     //update the slave once our status is okay
     if (s_stub != nullptr){
@@ -210,7 +220,8 @@ class SNSServiceImpl final : public SNSService::Service {
       follow.mutable_following()->Add(user1->client_following.begin(), user1->client_following.end());
       follow.mutable_followers()->Add(user1->client_followers.begin(), user1->client_followers.end());
       ClientContext context;
-      s_stub->FollowUpdate(&context, follow);
+      Filler fill1;
+      s_stub->FollowUpdate(&context, follow, fill1);
     }
     return Status::OK; 
   }
@@ -350,6 +361,7 @@ class SNSServiceImpl final : public SNSService::Service {
             }
     c->connected = false;
     return Status::OK;
+    }
   }
 
    Status FollowUpdate(ServerContext *context, const FollowData *request) override
