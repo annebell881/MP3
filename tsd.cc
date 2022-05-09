@@ -390,7 +390,7 @@ class SNSServiceImpl final : public SNSService::Service {
         return Status::OK;
     }
 
-    Status TimelineUpdate( const Message *context, const Message *request) override
+    Status TimelineUpdate(stream Message *context, stream Message *request) override
     {
         std::vector<std::string> messages;
         auto mesg = request->msg();
@@ -460,7 +460,7 @@ void RunServer(std::string port_no) {
 
       //Coordinator Stub
     std::string c_login_info = c_hostname + ":" + c_port;
-    c_stub = std::unique_ptr<SNSService::Stub>(SNSService::NewStub(grpc::CreateChannel(c_login_info, grpc::InsecureChannelCredentials())));
+    c_stub = std::unique_ptr<SNSCoordinator::Stub>(SNSCoordinator::NewStub(grpc::CreateChannel(c_login_info, grpc::InsecureChannelCredentials())));
 
     //WE need the information for the cluster
     ClientContext cont;
