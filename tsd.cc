@@ -390,14 +390,14 @@ class SNSServiceImpl final : public SNSService::Service {
         return Status::OK;
     }
 
-    Status TimelineUpdate (MsgTimeline *request, Filler *f) override
+    Status TimelineUpdate (MsgTimeline *request, Filler *f) 
     {
         std::vector<std::string> messages;
-        auto mesg = request->msg();
+        auto mesg = request.msg();
 
         std::copy(mesg.begin(), mesg.end(), messages.begin());
 
-        std::ofstream ofs(std::to_string(request->username()), std::ios::trunc);
+        std::ofstream ofs(std::to_string(request.username()), std::ios::trunc);
 
         for(std::string s : messages){
             ofs << s << std::endl;
