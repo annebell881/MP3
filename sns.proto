@@ -184,6 +184,6 @@ message Filler {
 
 //fixes overide issue
 message MsgTimeline {
-  int32 id = 1;
-  repeated string msgs = 2;
+  int32 username = 1;
+  repeated string msg = 2;
 }
