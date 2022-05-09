@@ -390,7 +390,7 @@ class SNSServiceImpl final : public SNSService::Service {
         return Status::OK;
     }
 
-    Status TimelineUpdate (MsgTimeline *request, Filler *f) 
+    /*Status TimelineUpdate (MsgTimeline *request, Filler *f) 
     {
         std::vector<std::string> messages;
         auto mesg = request->msg();
@@ -404,7 +404,7 @@ class SNSServiceImpl final : public SNSService::Service {
         }
 
         return Status::OK;
-    }
+    }*/
 
     Status LoginUpdate(ServerContext *context, const Request *request, Reply *reply) override
     {
