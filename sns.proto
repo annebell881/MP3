@@ -49,7 +49,7 @@ service SNSService{
   //Slave needs to updated in Followers, login and the timeline from master
   rpc FollowUpdate(FollowData) returns (Filler){}
   rpc LoginUpdate(Request) returns (Reply){}
-  rpc TimelineUpdate (stream Message) returns (stream Message){}
+  rpc TimelineUpdate (MsgTimeline) returns (Filler){}
   
 }
 
@@ -180,4 +180,10 @@ message FollowData {
 //issue with make had a problem with the get all users 
 message Filler {
   bool filled = 1;
+}
+
+//fixes overide issue
+message MsgTimeline {
+  int32 id = 1;
+  repeated string msgs = 2;
 }
