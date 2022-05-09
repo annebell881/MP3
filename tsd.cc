@@ -364,7 +364,7 @@ class SNSServiceImpl final : public SNSService::Service {
     
   }
 
-   Status FollowUpdate(ServerContext *context, const FollowData *request) override
+   Status FollowUpdate(ServerContext *context, const FollowData *request, Filler *fill) override
     {
         int id = request->id();
         int user_i = find_user(id);
@@ -390,7 +390,7 @@ class SNSServiceImpl final : public SNSService::Service {
         return Status::OK;
     }
 
-    Status TimelineUpdate(ServerContext *context, const Message *request) override
+    Status TimelineUpdate( const Message *context, const Message *request) override
     {
         std::vector<std::string> messages;
         auto mesg = request->msg();
