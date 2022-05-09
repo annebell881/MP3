@@ -237,7 +237,7 @@ class SNSServiceImpl final : public SNSService::Service {
   
   Status Login(ServerContext* context, const Request* request, Reply* reply) override {
     Client c;
-    std::string username = request->username();
+    int username = request->username();
     int user_index = find_user(username);
     if(user_index < 0){
       c.username = username;
@@ -250,7 +250,7 @@ class SNSServiceImpl final : public SNSService::Service {
         reply->set_msg("Invalid Username");
       else{
         std::string msg = "Welcome Back " + user->username;
-	reply->set_msg(msg);
+	      reply->set_msg(msg);
         user->connected = true;
       }
     }
