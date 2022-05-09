@@ -41,7 +41,7 @@ service SNSService{
   rpc Follow (Request) returns (Reply) {}
   //rpc UnFollow (Request) returns (Reply) {}
   // Bidirectional streaming RPC
-  rpc Timeline (Message) returns (Message) {} 
+  rpc Timeline (stream Message) returns (stream Message) {} 
 	
   //Need to connect the slave and master along with the streaming
   //slave needs master to know they exist
