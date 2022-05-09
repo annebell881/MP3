@@ -211,7 +211,6 @@ class SNSServiceImpl final : public SNSService::Service {
         user1->client_following.push_back(username2);
         user2->client_followers.push_back(username1);
         reply->set_msg("Follow Successful");
-      
 
       //update the slave once our status is okay
       if (s_stub != nullptr){
@@ -224,8 +223,7 @@ class SNSServiceImpl final : public SNSService::Service {
         s_stub->FollowUpdate(&context, follow, &fill1);
       }
     }
-      return Status::OK;  
-  
+    return Status::OK;  
   }
 
   /*Status UnFollow(ServerContext* context, const Request* request, Reply* reply) override {
@@ -446,8 +444,8 @@ class SNSServiceImpl final : public SNSService::Service {
       return Status::OK;
     }
 
-  }
 };
+
 
 
 void RunServer(std::string port_no) {
