@@ -47,7 +47,7 @@ service SNSService{
   //slave needs master to know they exist
   rpc SlaveToMaster(ServerInfo)returns(ServerInfo){}
   //Slave needs to updated in Followers, login and the timeline from master
-  rpc FollowUpdate(FollowData) returns (Reply){}
+  rpc FollowUpdate(FollowData) returns (Filler){}
   rpc LoginUpdate(Request) returns (Reply){}
   rpc TimelineUpdate (stream Message) returns (stream Message){}
   
@@ -64,7 +64,7 @@ service SNSCoordinator{
     rpc GetFollowing (JoinReq) returns (FollowerInfo){}
     // Bidirectional Communication to check on server interaction
     rpc getServerCon (HrtBeat) returns (HrtBeat) {}
-    rpc GetAllUsers (Request) returns (AllUsers) {}
+    rpc GetAllUsers (Filler) returns (AllUsers) {}
 }
 
 service SNSFollow{

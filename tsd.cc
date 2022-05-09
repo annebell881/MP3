@@ -208,22 +208,24 @@ class SNSServiceImpl final : public SNSService::Service {
 	      reply->set_msg("you have already joined");
         return Status::OK;
       }
-      user1->client_following.push_back(usernamr2);
-      user2->client_followers.push_back(username1);
-      reply->set_msg("Follow Successful");
-    
+        user1->client_following.push_back(username2);
+        user2->client_followers.push_back(username1);
+        reply->set_msg("Follow Successful");
+      
 
-    //update the slave once our status is okay
-    if (s_stub != nullptr){
-      FollowData follow;
-      follow.set_id(username1);
-      follow.mutable_following()->Add(user1->client_following.begin(), user1->client_following.end());
-      follow.mutable_followers()->Add(user1->client_followers.begin(), user1->client_followers.end());
-      ClientContext context;
-      Filler fill1;
-      s_stub->FollowUpdate(&context, follow, fill1);
-    }
-    return Status::OK; 
+      //update the slave once our status is okay
+      if (s_stub != nullptr){
+        FollowData follow;
+        follow.set_id(username1);
+        follow.mutable_following()->Add(user1->client_following.begin(), user1->client_following.end());
+        follow.mutable_followers()->Add(user1->client_followers.begin(), user1->client_followers.end());
+        ClientContext context;
+        Filler fill1;
+        s_stub->FollowUpdate(&context, follow, fill1);
+      }
+      return Status::OK; 
+    
+  }
   }
 
   /*Status UnFollow(ServerContext* context, const Request* request, Reply* reply) override {
