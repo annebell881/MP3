@@ -58,12 +58,14 @@
 
 using google::protobuf::Timestamp;
 using google::protobuf::Duration;
+using grpc::ClientContext;
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
 using grpc::ServerReader;
 using grpc::ServerReaderWriter;
 using grpc::ServerWriter;
+using grpc::Status;
 /*using grpc::Status;
 using csce438::Message;
 using csce438::ListReply;
@@ -71,7 +73,7 @@ using csce438::Request;
 using csce438::Reply;
 using csce438::SNSService;
 //add the cordinator into the  info
-/*using csce438::SNSCoordinatorinator;
+/*using csce438::SNSCoordinator;
 using csce438::Req;
 using csce438::Rep;
 using csce438::ClusterInfo;
@@ -83,7 +85,7 @@ using namespace csce438;
 
 
 struct Client {
-  std::string username;
+  int username;
   bool connected = true;
   int following_file_size = 0;
   //change the Client to id's since they dont have a username
@@ -118,10 +120,10 @@ std::string slave_addr;
 std::vector<Client> client_db;
 
 //Helper function used to find a Client object given its username
-int find_user(std::string username){
+int find_user(int user){
   int index = 0;
   for(Client c : client_db){
-    if(c.username == username)
+    if(c.username == user)
       return index;
     index++;
   }
@@ -134,14 +136,14 @@ void heartBeatFunc(){
   for(;;){
     HrtBeat hb;
     HrtBeat hb2;
-    hb.set_id(s_id);
-    hb.set_master(master);
+    hb.set_sid(s_id);
+    hb.set_s_type(master);
     ClientContext cont;
     //set the heartbeat to the stub
-    stat = c_stub->ServerCommunicate(&cont,hb, &hb2);
+    stat = c_stub->getServerCon(&cont,hb, &hb2);
     //check if their is a heartbeat
     if(!stat.ok()){
-      cout << "Failed to detect Heartbeat" << endl;
+      std::cout << "Failed to detect Heartbeat" << std::endl;
       return;
     } 
     //else check every 10 seconds for heartbeats
@@ -165,7 +167,8 @@ class SNSServiceImpl final : public SNSService::Service {
     int id = request->username();
     ClientContext cont;
     AllUsers user_base;
-    c_stub->GetAllUsers(&cont, &user_base);
+    Filler fill;
+    c_stub->GetAllUsers(&cont, filler, &user_base);
     for (auto u : user_base.users())
     {
       list_reply->add_all_users(u);
@@ -183,8 +186,8 @@ class SNSServiceImpl final : public SNSService::Service {
   }
 
   Status Follow(ServerContext* context, const Request* request, Reply* reply) override {
-    std::string username1 = request->username();
-    std::string username2 = request->arguments(0);
+    int username1 = request->username();
+    int username2 = request->arguments(0);
     int join_index = find_user(username2);
     if(join_index < 0 || username1 == username2)
       reply->set_msg("unkown user name");
@@ -192,7 +195,7 @@ class SNSServiceImpl final : public SNSService::Service {
       Client *user1 = &client_db[find_user(username1)];
       Client *user2 = &client_db[join_index];
       if(std::find(user1->client_following.begin(), user1->client_following.end(), user2) != user1->client_following.end()){
-	reply->set_msg("you have already joined");
+	      reply->set_msg("you have already joined");
         return Status::OK;
       }
       user1->client_following.push_back(user2);
@@ -263,16 +266,16 @@ class SNSServiceImpl final : public SNSService::Service {
     Message message;
     Client *c;
     while(stream->Read(&message)) {
-      std::string username = message.username();
+      int username = message.username();
       int user_index = find_user(username);
       c = &client_db[user_index];
  
       //Write the current message to "username.txt"
-      std::string filename = username+".txt";
+      /*std::string filename = username+".txt";
       std::ofstream user_file(filename,std::ios::app|std::ios::out|std::ios::in);
-      google::protobuf::Timestamp temptime = message.timestamp();
-      std::string time = google::protobuf::util::TimeUtil::ToString(temptime);
-      std::string fileinput = time+" :: "+message.username()+":"+message.msg()+"\n";
+      //google::protobuf::Timestamp temptime = message.timestamp();
+      //std::string time = google::protobuf::util::TimeUtil::ToString(temptime);
+      //std::string fileinput = time+" :: "+message.username()+":"+message.msg()+"\n";
       //"Set Stream" is the default message from the client to initialize the stream
       if(message.msg() != "Set Stream")
         user_file << fileinput;
@@ -317,8 +320,34 @@ class SNSServiceImpl final : public SNSService::Service {
 	std::ofstream user_file(temp_username + ".txt",std::ios::app|std::ios::out|std::ios::in);
         user_file << fileinput;
       }
-    }
+    }*/
     //If the client disconnected from Chat Mode, set connected to false
+    
+            // Write the current message to "usernametimeline.txt"
+            std::string filename = std::to_string(username) + "timeline.txt";
+            std::ofstream user_file(filename, std::ios::app | std::ios::out | std::ios::in);
+            time_t temptime = message.timestamp();
+            std::string ttime = getTimeStamp(temptime);
+            std::string fileinput = ttime + " :: " + std::to_string(message.username()) + ":" + message.msg() + "\n";
+            //"Set Stream" is the default message from the client to initialize the stream
+            if (message.msg() != "Set Stream")
+                user_file << fileinput;
+            // If message = "Set Stream", print the first 20 chats from the people you follow
+            
+            // Send the message to each follower's stream
+            std::vector<int>::const_iterator it;
+            for (it = c->client_followers.begin(); it != c->client_followers.end(); it++)
+            {
+                int u_index = find_user(*it);
+                if (u_index < 0 || u_index > client_db.size()){
+                    std::cerr << "User " << *it << " not in client_db" << std::endl;
+                    continue;
+                }
+                Client *temp_client = &client_db[u_index];
+                if (temp_client->stream != 0 && temp_client->connected)
+                    temp_client->stream->Write(message);
+                
+            }
     c->connected = false;
     return Status::OK;
   }
@@ -352,11 +381,11 @@ class SNSServiceImpl final : public SNSService::Service {
     Status TimelineUpdate(ServerContext *context, const Message *request) override
     {
         std::vector<std::string> messages;
-        auto mesg = request->mesg();
+        auto mesg = request->msg();
 
         std::copy(mesg.begin(), mesg.end(), messages.begin());
 
-        std::ofstream ofs(std::to_string(request->id()), std::ios::trunc);
+        std::ofstream ofs(std::to_string(request->username()), std::ios::trunc);
 
         for(std::string s : messages){
             ofs << s << std::endl;
@@ -377,7 +406,6 @@ class SNSServiceImpl final : public SNSService::Service {
           client_db.push_back(c);
           reply->set_msg("Login Successful!");
           user_index = find_user(username);
-          populate_following(username, user_index);
       }
       else
       {
@@ -386,7 +414,7 @@ class SNSServiceImpl final : public SNSService::Service {
               reply->set_msg("Invalid Username");
           else
           {
-              std::string msg = "Welcome Back " + std::to_string(user->username);
+              std::string msg = "Welcome Back " + user->username;
               reply->set_msg(msg);
               user->connected = true;
           }
@@ -397,13 +425,14 @@ class SNSServiceImpl final : public SNSService::Service {
     Status SlaveToMaster(ServerContext *context, const ServerInfo *request, ServerInfo *response) override
     {
       slave_port = request->port();
-      slave_addr = request->addr();
+      slave_addr = request->addre();
       std::string s_login_info = slave_addr + ":" + slave_port;
       s_stub = std::unique_ptr<SNSService::Stub>(SNSService::NewStub(grpc::CreateChannel(s_login_info, grpc::InsecureChannelCredentials())));
 
       return Status::OK;
     }
 
+  }
 };
 
 
@@ -419,35 +448,35 @@ void RunServer(std::string port_no) {
 
       //Coordinator Stub
     std::string c_login_info = c_hostname + ":" + c_port;
-    c_stub = std::unique_ptr<SNSCoord::Stub>(SNSCoord::NewStub(grpc::CreateChannel(c_login_info, grpc::InsecureChannelCredentials())));
+    c_stub = std::unique_ptr<SNSService::Stub>(SNSService::NewStub(grpc::CreateChannel(c_login_info, grpc::InsecureChannelCredentials())));
 
     //WE need the information for the cluster
     ClientContext cont;
     Status stat;
     ClusterInfo ci;
-    ci.set_addr(my_hostname); 
+    ci.set_addr(s_hostname); 
     ci.set_port(port_no);
-    ci.set_id(s_id);
-    ci.set_master(isMaster);
+    ci.set_followid(s_id);
+    ci.set_sid(master);
     ServerInfo si;
     //see if we can pull the cluster from the information
-    s = c_stub->ClusterSpace(&cont, ci, &si);
+    stat = c_stub->ClusterSpace(&cont, ci, &si);
     if (!stat.ok()) {
         std::cerr << "Error, failed to create a  cluster." << std::endl;
     }
     //if the cluster works, then use the heartbeat 
-    std::thread t(heartbeat);
+    std::thread t(heartBeatFunc);
     t.detach();
 
-    if (si.addr() != ""){
+    if (si.addre() != ""){
         //SNSService stub
-        std::string s_login_info = si.addr() + ":" + si.port();
+        std::string s_login_info = si.addre() + ":" + si.port();
         s_stub = std::unique_ptr<SNSService::Stub>(SNSService::NewStub(grpc::CreateChannel(s_login_info, grpc::InsecureChannelCredentials())));
 
         ClientContext context1;
         ServerInfo sib_id;
-        sib_id.set_port(my_port);
-        sib_id.set_addr("127.0.0.1"); 
+        sib_id.set_port(s_port);
+        sib_id.set_addre("127.0.0.1"); 
         ServerInfo r_id;
         s_stub->SlaveToMaster(&context1, sib_id, &r_id);
     }
@@ -462,11 +491,11 @@ int main(int argc, char** argv) {
     exit(1);
   }
   //est the coordinator and the server information
-  s_port = "3010"
+  s_port = "3010";
   c_hostname = "127.0.0.1";
   c_port = "";
   s_id = -1;
-  isMaster = false;
+  master = false;
 
     for (int i = 1; i < argc; i++)
     {
@@ -495,8 +524,8 @@ int main(int argc, char** argv) {
         }
         else if (arg == "-p")
         {
-            my_port = argv[i + 1];
-            if (my_port.size() > 6)
+            s_port = argv[i + 1];
+            if (s_port.size() > 6)
             {
               std::cerr << "Invalid arguments " <<  std::endl;
               exit(1);
@@ -517,9 +546,9 @@ int main(int argc, char** argv) {
         {
             std::string op(argv[i + 1]);
             if (op == "master")
-                isMaster = true;
+                master = true;
             else if (op == "slave")
-                isMaster = false;
+                master = false;
             else
             {
               std::cerr << "Invalid arguments " <<  std::endl;
@@ -529,7 +558,8 @@ int main(int argc, char** argv) {
         }
     }
     
-  RunServer(port);
+  RunServer(s_port);
 
   return 0;
 }
+

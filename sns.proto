@@ -47,7 +47,7 @@ service SNSService{
   //slave needs master to know they exist
   rpc SlaveToMaster(ServerInfo)returns(ServerInfo){}
   //Slave needs to updated in Followers, login and the timeline from master
-  rpc FollowUpdate(Request) returns (Reply){}
+  rpc FollowUpdate(FollowData) returns (Reply){}
   rpc LoginUpdate(Request) returns (Reply){}
   rpc TimelineUpdate (stream Message) returns (stream Message){}
   
@@ -59,11 +59,11 @@ service SNSCoordinator{
     //Server sends the cluster to the coordinator 
     rpc ClusterSpace (ClusterInfo) returns (ServerInfo){}
     //Client sends the connection to the coordinator
-    rpc GetConn(JoinReq) returns (ClusterInfo){}
+    rpc GetConn (JoinReq) returns (ClusterInfo){}
     //need the cluster to have the follower information
-    rpc GetFollowing(JoinReq) returns (FollowerInfo)
+    rpc GetFollowing (JoinReq) returns (FollowerInfo){}
     // Bidirectional Communication to check on server interaction
-    rpc ServerCommunicate (HrtBeat) returns (HrtBeat) {}
+    rpc getServerCon (HrtBeat) returns (HrtBeat) {}
     rpc GetAllUsers (Request) returns (AllUsers) {}
 }
 
@@ -74,13 +74,13 @@ service SNSFollow{
 }
 
 message ListReply {
-  repeated string all_users = 1;
-  repeated string followers = 2;
+  repeated int32 all_users = 1;
+  repeated int32 followers = 2;
 }
 
 message Request {
-  string username = 1;
-  repeated string arguments = 2;
+  int32 username = 1;
+  repeated int32 arguments = 2;
 }
 
 message Reply {
@@ -89,11 +89,11 @@ message Reply {
 
 message Message {
   //Username who sent the message
-  string username = 1;
+  int32 username = 1;
   //Message from the user
   string msg = 2;
   //Time the message was sent
-  google.protobuf.Timestamp timestamp = 3;
+  uint64 timestamp = 3;
 }
 
 enum ServerType{
@@ -125,7 +125,7 @@ message Rep{
 
 //Information surrounding the cluster AKA machine add, port, follower id and server id
 message ClusterInfo{
-  string machineAdd = 1;
+  string addr = 1;
   string port =2;
   int32 followId = 3;
   int32 sid = 4;
@@ -161,4 +161,20 @@ message HrtBeat{
 
 message AllUsers {
     repeated int32 users = 1;
+}
+
+message FollowPair {
+  //Client id follows fid
+  int32 id = 1;
+  int32 fid = 2; 
+}
+
+//Data about who a certain client follows
+message FollowData {
+  //The client's ID
+  int32 id = 1;
+  //Who they're following
+  repeated int32 following = 2;
+  //Whose following them
+  repeated int32 followers = 3;
 }

@@ -28,7 +28,7 @@ using csce438::ClusterInfo;
 using csce438::ServerInfo;
 using csce438::JoinReq;
 using csce438::FollowerInfo;
-using csce438::HeartBeat;
+using csce438::HrtBeat;
 
 //Client needs to retrieve the Coordinator Infomation
 std::string coord_host;
@@ -37,17 +37,17 @@ std::string coord_port;
 //Client is also going to need the following data
 int client_ID;
 //client ID is also frequently used throughout the code
-std::unique_ptr<csce438::SNSCoord::Stub> client_stub;
+std::unique_ptr<csce438::SNSCoordinator::Stub> client_stub;
 
 
-Message MakeMessage(const std::string& username, const std::string& msg) {
+Message MakeMessage(const int& username, const std::string& msg) {
     Message m;
     m.set_username(username);
     m.set_msg(msg);
-    google::protobuf::Timestamp* timestamp = new google::protobuf::Timestamp();
-    timestamp->set_seconds(time(NULL));
-    timestamp->set_nanos(0);
-    m.set_allocated_timestamp(timestamp);
+    //google::protobuf::Timestamp* timestamp = new google::protobuf::Timestamp();
+    //timestamp->set_seconds(time(NULL));
+    //timestamp->set_nanos(0);
+    m.set_timestamp(time(NULL));
     return m;
 }
 
@@ -55,7 +55,7 @@ class Client : public IClient
 {
     public:
         Client(const std::string& hname,
-               const std::string& uname,
+               const int& uname,
                const std::string& p)
             :hostname(hname), username(uname), port(p)
             {}
@@ -67,7 +67,7 @@ class Client : public IClient
         void renew_conn();
     private:
         std::string hostname;
-        std::string username;
+        int username;
         std::string port;
         // You can have an instance of the client stub
         // as a member variable.
@@ -75,16 +75,16 @@ class Client : public IClient
 
         IReply Login();
         IReply List();
-        IReply Follow(const std::string& username2);
-        IReply UnFollow(const std::string& username2);
-        void Timeline(const std::string& username);
+        IReply Follow(const int& username2);
+        IReply UnFollow(const int& username2);
+        void Timeline(const int& username);
 
 
 };
 
 int main(int argc, char** argv) {
     //main needs to be updated to match the call
-    if(argv != 5){
+    if(argc != 5){
         std::cerr << "Invalid number of arguments " <<  std::endl;
         exit(1);
     }
@@ -132,7 +132,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    Client myc(hostname, username, port);
+    Client myc(hostname, client_ID, port);
     // You MUST invoke "run_client" function to start business logic
     myc.run_client();
 
@@ -152,24 +152,24 @@ int Client::connectTo()
 	// ------------------------------------------------------------
     //need to add functions to connect to the cordinator
     std::string cord_login_info = coord_host + ":" + coord_port;
-    client_stub = std::<SNSCoord::Stub>(SNSCoord::NewStub(grpc::CreateChannel(cord_login_info, grpc::InsecureChannelCredentials())));
+    client_stub = std::unique_ptr<SNSCoordinator::Stub>(SNSCoordinator::NewStub(grpc::CreateChannel(cord_login_info, grpc::InsecureChannelCredentials())));
     //grab the context to create the log in info below in MP2
     ClientContext contex;
     JoinReq join_rq;
     join_rq.set_id(client_ID);
     ClusterInfo clusI;
-    client_stub->GetConnection(&contex, join_rq,clusI);
+    client_stub->GetConn(&contex, join_rq,&clusI);
     //MP2 soultion
     //update it to match the cluster
-    std::string login_info = clusI.addres() + ":" + clusI.port();
+    std::string login_info = clusI.addr() + ":" + clusI.port();
     stub_ = std::unique_ptr<SNSService::Stub>(SNSService::NewStub(
                grpc::CreateChannel(
                     login_info, grpc::InsecureChannelCredentials())));
-    hostname = clusI.addres();
+    hostname = clusI.addr();
     port = clusI.port();
     //thread the cluster into the coordinator
     std::thread clust_thread(&Client::renew_conn,this);
-    t.detach();
+    clust_thread.detach();
 
     IReply ire = Login();
     if(!ire.grpc_status.ok()) {
@@ -238,7 +238,7 @@ IReply Client::processCommand(std::string& input)
         }
         */
 
-        std::string argument = input.substr(index+1, (input.length()-index));
+        int argument = atoi(input.substr(index+1).c_str());
 
         if (cmd == "FOLLOW") {
             return Follow(argument);
@@ -301,17 +301,17 @@ IReply Client::List() {
         ire.comm_status = SUCCESS;
         std::string all_users;
         std::string following_users;
-        for(std::string s : list_reply.all_users()){
-            ire.all_users.push_back(s);
+        for(int s : list_reply.all_users()){
+            ire.all_users.push_back(std::to_string(s));
         }
-        for(std::string s : list_reply.followers()){
-            ire.followers.push_back(s);
+        for(int s : list_reply.followers()){
+            ire.followers.push_back(std::to_string(s));
         }
     }
     return ire;
 }
         
-IReply Client::Follow(const std::string& username2) {
+IReply Client::Follow(const int& username2) {
     Request request;
     request.set_username(username);
     request.add_arguments(username2);
@@ -380,7 +380,7 @@ IReply Client::Login() {
     return ire;
 }
 
-void Client::Timeline(const std::string& username) {
+void Client::Timeline(const int& username) {
     ClientContext context;
 
     std::shared_ptr<ClientReaderWriter<Message, Message>> stream(
@@ -403,9 +403,9 @@ void Client::Timeline(const std::string& username) {
             Message m;
             while(stream->Read(&m)){
 
-            google::protobuf::Timestamp temptime = m.timestamp();
-            std::time_t time = temptime.seconds();
-            displayPostMessage(m.username(), m.msg(), time);
+            //google::protobuf::Timestamp temptime = m.timestamp();
+            std::time_t time = m.timestamp();
+            displayPostMessage(std::to_string(m.username()), m.msg(), time);
             }
             });
 
@@ -423,7 +423,7 @@ void Client::renew_conn(){
         JoinReq join_req;
         join_req.set_id(client_ID);
         ClusterInfo clusI;
-        client_stub->GetConnection(&cont, join_req, &clusI);
+        client_stub->GetConn(&cont, join_req, &clusI);
         //now we need to fix the ports and clients
         if (port != clusI.port() || hostname != clusI.addr()){
             std::string login_info = clusI.addr() + ":" + clusI.port();
