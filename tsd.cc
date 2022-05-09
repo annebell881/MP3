@@ -221,11 +221,11 @@ class SNSServiceImpl final : public SNSService::Service {
         follow.mutable_followers()->Add(user1->client_followers.begin(), user1->client_followers.end());
         ClientContext context;
         Filler fill1;
-        s_stub->FollowUpdate(&context, follow, fill1);
+        s_stub->FollowUpdate(&context, follow, &fill1);
       }
-      return Status::OK; 
-    
-  }
+    }
+      return Status::OK;  
+  
   }
 
   /*Status UnFollow(ServerContext* context, const Request* request, Reply* reply) override {
@@ -274,8 +274,7 @@ class SNSServiceImpl final : public SNSService::Service {
     return Status::OK;
   }
 
-  Status Timeline(ServerContext* context, 
-		ServerReaderWriter<Message, Message>* stream) override {
+  Status Timeline(ServerContext* context, ServerReaderWriter<Message, Message>* stream) override {
     Message message;
     Client *c;
     while(stream->Read(&message)) {
@@ -362,8 +361,9 @@ class SNSServiceImpl final : public SNSService::Service {
                 
             }
     c->connected = false;
-    return Status::OK;
     }
+    return Status::OK;
+    
   }
 
    Status FollowUpdate(ServerContext *context, const FollowData *request) override
